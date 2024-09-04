@@ -9,17 +9,24 @@ from tabs.time_table_tab import TimeTableTab
 from tabs.time_exclusion_tab import TimeExclusionTab
 from tabs.already_taken_classes_tab import AlreadyTakenClassesTab
 from course_schduler_backend import CourseSchedulerBackend
-import sqlite3, logging
+from status_dialog import Worker, ProgressDialog
+import sqlite3, logging, os
 
 class CourseScheduler(QMainWindow):
     def __init__(self, db_path='courses.db'):
         super().__init__()
         self.db_path = db_path
+        self.conn = None
         self.logger = logging.getLogger('scheduler_logger')
         self.logger.setLevel(logging.DEBUG)
-        self.conn = sqlite3.connect(self.db_path)
-        self.scraper = CourseScraper(logger=self.logger, conn=self.conn)
-        self.backend = CourseSchedulerBackend(parent=self, logger=self.logger, conn=self.conn)
+        self.scraper = CourseScraper(logger=self.logger)
+        self.backend = CourseSchedulerBackend(parent=self, logger=self.logger)
+        if os.path.exists(self.db_path):
+            self.conn = sqlite3.connect(self.db_path)
+            self.backend.conn = self.conn
+            self.backend.load_state(self.backend.state_file_addr) # THIS SHOULD BE ABOVE FETCH_MAJOR_SPECIFIC_DATA()
+            self.backend.load_data()
+            self.backend.fetch_major_specific_data()
         self.setWindowTitle("Course Scheduler")
         self.layout = QVBoxLayout()
         container = QWidget()
@@ -38,6 +45,10 @@ class CourseScheduler(QMainWindow):
         # Main Layout
         self._init_control_layout()
         self._init_tabs()
+        self.worker = Worker(parent=self, db_path=self.db_path)
+        self.progress_dialog = ProgressDialog(self)
+        self.worker.finished.connect(lambda: self.progress_dialog.finished_button.setEnabled(True))
+        self.worker.progress_updated.connect(self.progress_dialog.update_progress)
 
     def _init_control_layout(self):
         control_layout = QHBoxLayout()
@@ -46,7 +57,6 @@ class CourseScheduler(QMainWindow):
         update_btn.clicked.connect(self.handle_update_database)
         calculate_btn = QPushButton('Calculate Combinations')
         calculate_btn.clicked.connect(self.calculate_combinations)
-
 
         control_layout.addWidget(self.major_dropdown)
         control_layout.addWidget(update_btn)
@@ -99,7 +109,11 @@ class CourseScheduler(QMainWindow):
         return False
 
     def update_database(self):
-        self.scraper.update_database()
+        if self.conn == None:
+            self.conn = sqlite3.connect(self.db_path)
+            self.backend.conn = self.conn
+        self.worker.start()
+        self.progress_dialog.show()
         self.backend.reset_state()
         self.backend.save_state(self.backend.state_file_addr)
         self.backend.load_data()

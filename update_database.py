@@ -6,10 +6,10 @@ import sqlite3, json, re, logging, requests
 # https://www.sis.itu.edu.tr/TR/ogrenci/lisans/ders-bilgileri/ders-bilgileri.php?subj=MAT&numb=103
 
 class CourseScraper:
-    def __init__(self, logger, conn):
+    def __init__(self, logger):
         self._config()
+        self.conn = None
         self.logger = logger
-        self.conn = conn
         self.course_list = []
         self.class_list = []
         self.professor_list = []
@@ -33,14 +33,14 @@ class CourseScraper:
             'Friday': 5
         }
 
-    def update_database(self):
-        self._reset_state()
+    def fetch_classes(self):
         if self._table_exists('Classes'):
             self.logger.debug('Classes table already exists.')
             self._load_class_code_name_map()
         else:
             self._download_classes_if_not_exist()
-            
+
+    def update_database(self):
         # CLASS CODE IDS FOR POST REQUEST FOR SCRAPING INDIVIDUAL WEB PAGES
         # THEY MAY CHANGE IN THE FUTURE SO YOU MAY HAVE TO UPDATE THEM
         class_code_ids = ['42', '227', '305', '302', '43', '200', '149', '165', '38', '30', '3', '180', '155', '127',
@@ -98,10 +98,6 @@ class CourseScraper:
                 # COURSE_ID IS 1 INDEXED SO DONT SUBTRACT 1
                 self._save_major_and_course_ids(row['sinifProgram'], course_id=len(self.course_list)) # returns major ids as a string not as a list
         
-        
-        self._store_in_db()
-        self._reset_state()
-
 
     def debug_course(self, course):
         print('*' * 30)
@@ -285,7 +281,7 @@ class CourseScraper:
         self.conn.commit()
         self.class_code_name_map = {c[1]: c[0] for c in class_list}
     
-    def _store_in_db(self):
+    def store_in_db(self):
         self._create_tables_if_not_exist()
         cursor = self.conn.cursor()
 
@@ -312,6 +308,7 @@ class CourseScraper:
         cursor.executemany('''INSERT INTO Majors (major_id, major_name, course_ids)
                             VALUES (?, ?, ?)''', self.majors_list)
         self.conn.commit()
+        self._reset_state()
 
     def _create_tables_if_not_exist(self):
         cursor = self.conn.cursor()

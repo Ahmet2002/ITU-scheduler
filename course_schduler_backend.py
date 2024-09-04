@@ -4,11 +4,11 @@ from bs4 import BeautifulSoup
 import sqlite3, json, os, requests, re
 
 class CourseSchedulerBackend:
-    def __init__(self, parent, logger, conn):
+    def __init__(self, parent, logger):
         self._config()
         self.parent = parent
         self.logger = logger
-        self.conn = conn
+        self.conn = None
         self.student_major_id = 0
         self.allready_taken_class_codes = set()
         self.prerequisite_class_codes_set = set()
@@ -28,9 +28,7 @@ class CourseSchedulerBackend:
         self.class_id_to_course_ids_map = {}
         self.class_code_name_to_id_map = {}
         self.course_id_to_same_time_course_ids_map = {}
-        self.load_state(self.state_file_addr) # THIS SHOULD BE ABOVE FETCH_MAJOR_SPECIFIC_DATA()
-        self.load_data()
-        self.fetch_major_specific_data()
+
 
     def _config(self):
         self.day_start_time = QTime(8, 30) # 8:30
@@ -226,7 +224,7 @@ class CourseSchedulerBackend:
         print('*' * 30)
 
     def load_data(self):
-        self.parent.scraper._create_tables_if_not_exist()
+        self._create_tables_if_not_exist()
         cursor = self.conn.cursor()
 
         cursor.execute("SELECT major_name FROM Majors")
@@ -392,3 +390,36 @@ class CourseSchedulerBackend:
     @staticmethod
     def _time_to_minutes(time):
         return time.hour() * 60 + time.minute()
+    
+    def _create_tables_if_not_exist(self):
+        cursor = self.conn.cursor()
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Courses (
+            course_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            crn TEXT,
+            professor_id INTEGER,
+            class_id INTEGER,
+            time_tuples TEXT,
+            quota INTEGER,
+            FOREIGN KEY(professor_id) REFERENCES Professors(professor_id),
+            FOREIGN KEY(class_id) REFERENCES Classes(class_id)
+        )''')
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Classes (
+            class_id INTEGER PRIMARY KEY,
+            class_code_name TEXT,
+            class_title TEXT,
+            prerequisite_class_ids TEXT -- Store as a comma-separated string
+        )''')
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Majors (
+            major_id INTEGER PRIMARY KEY,
+            major_name TEXT,
+            course_ids TEXT -- Store as a comma-separated string
+        )''')
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Professors (
+            professor_id INTEGER PRIMARY KEY,
+            professor_name TEXT
+        )''')
+        self.conn.commit()
