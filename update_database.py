@@ -32,18 +32,18 @@ class CourseScraper:
             'Thursday': 4,
             'Friday': 5
         }
-
-    def fetch_classes(self):
-        if self._table_exists('Classes'):
-            self.logger.debug('Classes table already exists.')
-            self._load_class_code_name_map()
-        else:
-            self._download_classes_if_not_exist()
-
-    def update_database(self):
-        # CLASS CODE IDS FOR POST REQUEST FOR SCRAPING INDIVIDUAL WEB PAGES
-        # THEY MAY CHANGE IN THE FUTURE SO YOU MAY HAVE TO UPDATE THEM
-        class_code_ids = ['42', '227', '305', '302', '43', '200', '149', '165', '38', '30', '3', '180', '155', '127',
+        self.class_codes = ['AKM', 'ATA', 'BED', 'BIL', 'BIO', 'BLG', 'BUS', 'CAB', 'CEV',
+        'CHZ', 'CIE', 'CMP', 'COM', 'DEN', 'DFH', 'DNK', 'DUI', 'EAS', 'EEF', 'ECO',
+        'ECN', 'EHB', 'EHN', 'EKO', 'ELE', 'ELH', 'ELK', 'END', 'ENR', 'ENT', 'ESL',
+        'ETH', 'ETK', 'EUT', 'FIZ', 'GED', 'GEM', 'GEO', 'GID', 'GMI', 'GSB', 'GUV',
+        'HUK', 'HSS', 'ICM', 'ILT', 'IML', 'ING', 'INS', 'ISE', 'ISL', 'ISH', 'ITB',
+        'JDF', 'JEF', 'JEO', 'KIM', 'KMM', 'KMP', 'KON', 'MAD', 'MAK', 'MAL', 'MAR',
+        'MAT', 'MCH', 'MEK', 'MEN', 'MET', 'MDN', 'MIM', 'MMD', 'MOD', 'MRT', 'MRE',
+        'MRT', 'MTO', 'MTH', 'MTM', 'MTR', 'MST', 'MUH', 'MUK', 'MUT', 'MUZ', 'NAE',
+        'NTH', 'PAZ', 'PEM', 'PET', 'PHE', 'PHY', 'RES', 'SBP', 'SAO', 'SES', 'STA',
+        'STI', 'TDW', 'TEB', 'TEK', 'TEL', 'TER', 'TES', 'THO', 'TUR', 'UCK', 'UZB',
+        'VBA', 'YTO', 'YZV']
+        self.class_code_ids = ['42', '227', '305', '302', '43', '200', '149', '165', '38', '30', '3', '180', '155', '127',
         '304', '7', '169', '137', '81', '142', '245', '146', '208', '168', '243', '10', '163', '181', '44', '32',
         '141', '232', '154', '289', '294', '297', '182', '196', '241', '39', '59', '2', '1', '178', '15', '183', 
         '179', '207', '225', '140', '164', '110', '22', '28', '226', '175', '138', '11', '74', '4', '162', '46', 
@@ -54,6 +54,19 @@ class CourseScraper:
         '307', '237', '21', '288', '171', '124', '291', '193', '172', '37', '159', '261', '121', '13', '57', '49', '269', 
         '129', '65', '215', '170', '34', '25', '195', '24', '306', '198', '213', '221']
 
+
+    def fetch_classes(self, progress_signal):
+        if self._table_exists('Classes'):
+            self.logger.debug('Classes table already exists.')
+            self._load_class_code_name_map()
+        else:
+            self._download_classes_if_not_exist(progress_signal)
+
+    def update_database(self, progress_signal):
+        # CLASS CODE IDS FOR POST REQUEST FOR SCRAPING INDIVIDUAL WEB PAGES
+        # THEY MAY CHANGE IN THE FUTURE SO YOU MAY HAVE TO UPDATE THEM
+        self.fetch_classes(progress_signal)
+
         # URL of the page containing the table
         session = requests.Session()
         response = session.get("https://obs.itu.edu.tr/public/DersProgram")
@@ -62,7 +75,8 @@ class CourseScraper:
         # Extract the verification token from the hidden input field
         token = soup.find("input", {"name": "__RequestVerificationToken"})["value"]
 
-        for class_code_id in class_code_ids:
+        i = len(self.class_code_ids) + 1
+        for class_code_id in self.class_code_ids:
             form_data = {
                 "ProgramSeviyeTipiAnahtari": "LS",  # Example: 'LS' for Lisans
                 "dersBransKoduId": class_code_id,  # Example: '196' for EHB (Electronics Classes)
@@ -97,6 +111,12 @@ class CourseScraper:
                 ])
                 # COURSE_ID IS 1 INDEXED SO DONT SUBTRACT 1
                 self._save_major_and_course_ids(row['sinifProgram'], course_id=len(self.course_list)) # returns major ids as a string not as a list
+            
+            progress_signal.emit(i)
+            i += 1
+
+        self.store_in_db()
+        self._reset_state()
         
 
     def debug_course(self, course):
@@ -222,22 +242,13 @@ class CourseScraper:
         self.class_iter = len(class_infos) + 1
 
     
-    def _download_classes_if_not_exist(self):
-        class_codes = ['AKM', 'ATA', 'BED', 'BIL', 'BIO', 'BLG', 'BUS', 'CAB', 'CEV',
-        'CHZ', 'CIE', 'CMP', 'COM', 'DEN', 'DFH', 'DNK', 'DUI', 'EAS', 'EEF', 'ECO',
-        'ECN', 'EHB', 'EHN', 'EKO', 'ELE', 'ELH', 'ELK', 'END', 'ENR', 'ENT', 'ESL',
-        'ETH', 'ETK', 'EUT', 'FIZ', 'GED', 'GEM', 'GEO', 'GID', 'GMI', 'GSB', 'GUV',
-        'HUK', 'HSS', 'ICM', 'ILT', 'IML', 'ING', 'INS', 'ISE', 'ISL', 'ISH', 'ITB',
-        'JDF', 'JEF', 'JEO', 'KIM', 'KMM', 'KMP', 'KON', 'MAD', 'MAK', 'MAL', 'MAR',
-        'MAT', 'MCH', 'MEK', 'MEN', 'MET', 'MDN', 'MIM', 'MMD', 'MOD', 'MRT', 'MRE',
-        'MRT', 'MTO', 'MTH', 'MTM', 'MTR', 'MST', 'MUH', 'MUK', 'MUT', 'MUZ', 'NAE',
-        'NTH', 'PAZ', 'PEM', 'PET', 'PHE', 'PHY', 'RES', 'SBP', 'SAO', 'SES', 'STA',
-        'STI', 'TDW', 'TEB', 'TEK', 'TEL', 'TER', 'TES', 'THO', 'TUR', 'UCK', 'UZB',
-        'VBA', 'YTO', 'YZV']
+    def _download_classes_if_not_exist(self, progress_signal):
+
         class_list = []
         self.class_iter = 1
 
-        for class_code in class_codes:
+        i = 1
+        for class_code in self.class_codes:
             form_data = {'derskodu': class_code}
             response = requests.post(self.prerequisites_url, data=form_data)
 
@@ -265,6 +276,9 @@ class CourseScraper:
                     '&'.join('|'.join(or_group) for or_group in parsed_prerequisites)
                 ])
                 self.class_iter += 1
+            
+            progress_signal.emit(i)
+            i += 1
 
         cursor = self.conn.cursor()
         cursor.execute('''
@@ -308,7 +322,6 @@ class CourseScraper:
         cursor.executemany('''INSERT INTO Majors (major_id, major_name, course_ids)
                             VALUES (?, ?, ?)''', self.majors_list)
         self.conn.commit()
-        self._reset_state()
 
     def _create_tables_if_not_exist(self):
         cursor = self.conn.cursor()
