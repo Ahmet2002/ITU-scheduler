@@ -27,8 +27,6 @@ class ProgressDialog(QDialog):
         self.status_label = QLabel(self)
         self.status_label.setText('Updating Database...')
         self.progress_bar = QProgressBar(self)
-        print(len(self.parent.scraper.class_codes)
-                                + len(self.parent.scraper.class_code_ids))
         self.progress_bar.setRange(0, len(self.parent.scraper.class_codes)
                                 + len(self.parent.scraper.class_code_ids))
         self.progress_bar.setValue(0)
@@ -44,7 +42,6 @@ class ProgressDialog(QDialog):
         self.setLayout(self.layout)
 
     def update_progress(self, value):
-        print(value)
         self.progress_bar.setValue(value)
 
     def on_finish(self):
