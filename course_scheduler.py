@@ -21,7 +21,9 @@ class CourseScheduler(QMainWindow):
         self.logger.setLevel(logging.DEBUG)
         self.scraper = CourseScraper(logger=self.logger)
         self.backend = CourseSchedulerBackend(parent=self, logger=self.logger)
+        self.initial_state = True
         if os.path.exists(self.db_path):
+            self.initial_state = False
             self.conn = sqlite3.connect(self.db_path)
             self.backend.conn = self.conn
             self.backend.load_state(self.backend.state_file_addr) # THIS SHOULD BE ABOVE FETCH_MAJOR_SPECIFIC_DATA()
@@ -47,7 +49,7 @@ class CourseScheduler(QMainWindow):
         self._init_tabs()
         self.worker = Worker(parent=self, db_path=self.db_path)
         self.progress_dialog = ProgressDialog(self)
-        self.worker.finished.connect(lambda: self.progress_dialog.finished_button.setEnabled(True))
+        self.worker.thread_returned.connect(self.handle_update_database_finish)
         self.worker.progress_updated.connect(self.progress_dialog.update_progress)
 
     def _init_control_layout(self):
@@ -114,6 +116,10 @@ class CourseScheduler(QMainWindow):
             self.backend.conn = self.conn
         self.worker.start()
         self.progress_dialog.show()
+
+
+    def _reset_program_state(self):
+        self.initial_state = False
         self.backend.reset_state()
         self.backend.save_state(self.backend.state_file_addr)
         self.backend.load_data()
@@ -121,6 +127,22 @@ class CourseScheduler(QMainWindow):
         self.update_major_dropdown()
         self.time_table_tab.update_time_table()
         self.time_table_tab.show_current_result()
+
+    def handle_update_database_finish(self, return_code):
+        self.worker.quit()
+        self.worker.wait()
+        messages = ['Finished', 'Connection Error Occured', 'Update Cancelled']
+        if return_code == self.scraper.SUCCESS:
+            self._reset_program_state()
+        # if the program is in initial state and
+        # database exists in the db_path it is deleted
+        elif self.initial_state and os.path.exists(self.db_path):
+            os.remove(self.db_path)
+        
+        self.progress_dialog.status_label.setText(messages[return_code])
+        self.progress_dialog.enable_close_and_finish_buttons()
+
+            
 
     def update_major_and_refetch_data(self, index):
         self.backend.reset_state()

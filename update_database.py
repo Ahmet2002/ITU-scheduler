@@ -21,10 +21,14 @@ class CourseScraper:
         self.class_iter = 1
         self.professor_iter = 1
         self.major_iter = 1
+        self.cancelled = False
 
     def _config(self):
         self.max_class_day_count = 3
         self.prerequisites_url = 'https://www.sis.itu.edu.tr/TR/ogrenci/lisans/onsartlar/onsartlar.php'
+        self.SUCCESS = 0
+        self.ERROR_INVALID_STATUS_CODE = 1
+        self.CANCELLED = 2
         self.days = {
             'Monday': 1,
             'Tuesday': 2,
@@ -54,18 +58,24 @@ class CourseScraper:
         '307', '237', '21', '288', '171', '124', '291', '193', '172', '37', '159', '261', '121', '13', '57', '49', '269', 
         '129', '65', '215', '170', '34', '25', '195', '24', '306', '198', '213', '221']
 
+    def trigger_cancel(self):
+        self.cancelled = True
+
 
     def fetch_classes(self, progress_signal):
         if self._table_exists('Classes'):
             self.logger.debug('Classes table already exists.')
             self._load_class_code_name_map()
         else:
-            self._download_classes_if_not_exist(progress_signal)
+            return self._download_classes_if_not_exist(progress_signal)
+        return self.SUCCESS
 
     def update_database(self, progress_signal):
         # CLASS CODE IDS FOR POST REQUEST FOR SCRAPING INDIVIDUAL WEB PAGES
         # THEY MAY CHANGE IN THE FUTURE SO YOU MAY HAVE TO UPDATE THEM
-        self.fetch_classes(progress_signal)
+        return_code = self.fetch_classes(progress_signal)
+        if return_code != self.SUCCESS:
+            return self._reset_state_and_return(return_code)
 
         # URL of the page containing the table
         session = requests.Session()
@@ -77,6 +87,9 @@ class CourseScraper:
 
         i = len(self.class_code_ids) + 1
         for class_code_id in self.class_code_ids:
+            if self.cancelled:
+                return self._reset_state_and_return(self.CANCELLED)
+            
             form_data = {
                 "ProgramSeviyeTipiAnahtari": "LS",  # Example: 'LS' for Lisans
                 "dersBransKoduId": class_code_id,  # Example: '196' for EHB (Electronics Classes)
@@ -84,9 +97,9 @@ class CourseScraper:
             }
 
             post_response = session.post("https://obs.itu.edu.tr/public/DersProgram/DersProgramSearch", data=form_data)
-            if not post_response.status_code != '200':
+            if post_response.status_code != 200:
                 self.logger.debug(f'Invalid Response, status code: {post_response.status_code}')
-                return
+                return self._reset_state_and_return(self.ERROR_INVALID_STATUS_CODE)
 
             data = json.loads(post_response.text)
 
@@ -116,7 +129,7 @@ class CourseScraper:
             i += 1
 
         self.store_in_db()
-        self._reset_state()
+        return self._reset_state_and_return(self.SUCCESS)
         
 
     def debug_course(self, course):
@@ -155,7 +168,7 @@ class CourseScraper:
             return False
         return True
     
-    def _reset_state(self):
+    def _reset_state_and_return(self, return_id):
         self.course_list = []
         self.class_list = []
         self.professor_list = []
@@ -168,6 +181,8 @@ class CourseScraper:
         self.class_iter = 1
         self.professor_iter = 1
         self.major_iter = 1
+        self.cancelled = False
+        return return_id
 
     def _get_professor_id(self, instructor):
         if instructor not in self.professor_name_map:
@@ -249,12 +264,15 @@ class CourseScraper:
 
         i = 1
         for class_code in self.class_codes:
+            if self.cancelled:
+                return self.CANCELLED
+            
             form_data = {'derskodu': class_code}
             response = requests.post(self.prerequisites_url, data=form_data)
 
-            if not response.status_code != '200':
-                self.logger.debug(f'Invalid Response for prerequisites for {class_code}, status code: {response.status_code}')
-                continue
+            if response.status_code != 200:
+                print(f'Invalid Response for prerequisites for {class_code}, status code: {response.status_code}')
+                return self.ERROR_INVALID_STATUS_CODE
 
             soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -280,6 +298,7 @@ class CourseScraper:
             progress_signal.emit(i)
             i += 1
 
+        self.class_code_name_map = {c[1]: c[0] for c in class_list}
         cursor = self.conn.cursor()
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS Classes (
@@ -293,7 +312,7 @@ class CourseScraper:
         cursor.executemany('''INSERT INTO Classes (class_id, class_code_name, class_title, prerequisite_class_ids)
                                 VALUES (?, ?, ?, ?)''', class_list)
         self.conn.commit()
-        self.class_code_name_map = {c[1]: c[0] for c in class_list}
+        return self.SUCCESS
     
     def store_in_db(self):
         self._create_tables_if_not_exist()
@@ -364,7 +383,7 @@ class CourseScraper:
 #     scraper.update_database()
 
 #     # BEFORE DEBUGGING
-#     # CHECK IF _reset_state IN THE LAST PART OF UPDATE_DATA_BASE()
+#     # CHECK IF _reset_state_and_return IN THE LAST PART OF UPDATE_DATA_BASE()
 #     # IS COMMENTED OUT OR NOT IT SHOULD BE COMMENTED OUT
 #     # IF NOTHING SHOWS UP IN THE TERMINAL
 #     # scraper.debug_courses()

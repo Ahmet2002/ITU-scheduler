@@ -1,20 +1,7 @@
 {
     "selected_class_code_names": [],
-    "allready_taken_class_codes": [
-        "EHB 206",
-        "MAT 281",
-        "EHB 335E",
-        "EHB 308E",
-        "EHB 262",
-        "EHB 110E"
-    ],
-    "excluded_time_blocks": [
-        [
-            1,
-            510,
-            1050
-        ]
-    ],
+    "allready_taken_class_codes": [],
+    "excluded_time_blocks": [],
     "student_major_id": 0,
     "course_id_to_same_time_course_ids_map": {},
     "results": [],
