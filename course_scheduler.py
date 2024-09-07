@@ -4,6 +4,8 @@ from PyQt5.QtWidgets import (
     QTabWidget
 )
 from update_database import CourseScraper
+from tabs.class_portfolio_tab import ClassPortfolioTab
+from tabs.added_classes_tab import AddedClassesTab
 from tabs.slot_list_tab import SlotListTab
 from tabs.time_table_tab import TimeTableTab
 from tabs.time_exclusion_tab import TimeExclusionTab
@@ -67,11 +69,20 @@ class CourseScheduler(QMainWindow):
 
     def _init_tabs(self):
         self.tabs = QTabWidget(self)
+        self.class_portfolio_tab = ClassPortfolioTab(self.tabs, self.backend)
+        self.added_classes_tab = AddedClassesTab(self.tabs, self.backend)
         self.slot_list_tab = SlotListTab(self.tabs, self.backend)
         self.time_table_tab = TimeTableTab(self.tabs, self.backend)
         self.already_taken_classes_tab = AlreadyTakenClassesTab(self.tabs, self.backend)
         self.time_exclusion_tab = TimeExclusionTab(self.tabs, self.backend)
 
+        self.class_portfolio_tab.classes_list.added.connect(self.added_classes_tab.add_class)
+        self.class_portfolio_tab.classes_list.removed.connect(self.added_classes_tab.remove_class)
+        self.added_classes_tab.added_classes_list.removed.connect(self.added_classes_tab.remove_class)
+        self.added_classes_tab.added_classes_list.removed.connect(self.class_portfolio_tab.toggle_class_if_necessary)
+
+        self.tabs.addTab(self.class_portfolio_tab, 'Class Portfolio')
+        self.tabs.addTab(self.added_classes_tab, 'Added Classes')
         self.tabs.addTab(self.slot_list_tab, 'Select Classes')
         self.tabs.addTab(self.time_table_tab, 'Time Table')
         self.tabs.addTab(self.already_taken_classes_tab, 'Already Taken Classes')
@@ -131,16 +142,18 @@ class CourseScheduler(QMainWindow):
     def handle_update_database_finish(self, return_code):
         self.worker.quit()
         self.worker.wait()
-        messages = ['Finished', 'Connection Error Occured', 'Update Cancelled']
         if return_code == self.scraper.SUCCESS:
             self._reset_program_state()
+            self.added_classes_tab.added_classes_list.clear_list()
+            self.class_portfolio_tab.update_portfolio()
         # if the program is in initial state and
         # database exists in the db_path it is deleted
         elif self.initial_state and os.path.exists(self.db_path):
             os.remove(self.db_path)
         
-        self.progress_dialog.status_label.setText(messages[return_code])
+        self.progress_dialog.update_status(return_code)
         self.progress_dialog.enable_close_and_finish_buttons()
+
 
             
 
@@ -151,6 +164,8 @@ class CourseScheduler(QMainWindow):
         self.time_table_tab.update_time_table()
         self.time_table_tab.show_current_result()
         self.backend.fetch_major_specific_data()
+        self.class_portfolio_tab.update_portfolio()
+        self.added_classes_tab.added_classes_list.clear_list()
 
     def update_major_id_and_dropdown(self, index):
         self.backend.update_student_major(index)

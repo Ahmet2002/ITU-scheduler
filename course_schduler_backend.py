@@ -1,7 +1,9 @@
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtCore import QTime
 from bs4 import BeautifulSoup
-import sqlite3, json, os, requests, re
+from sortedcontainers import SortedDict
+from utils.trie import Trie
+import json, os
 
 class CourseSchedulerBackend:
     def __init__(self, parent, logger):
@@ -28,6 +30,10 @@ class CourseSchedulerBackend:
         self.class_id_to_course_ids_map = {}
         self.class_code_name_to_id_map = {}
         self.course_id_to_same_time_course_ids_map = {}
+        self.class_code_to_class_ids_map = SortedDict()
+        self.current_class_code = None
+        self.added_classes = SortedDict()
+        self.auto_suggest_trie = Trie()
 
 
     def _config(self):
@@ -61,6 +67,10 @@ class CourseSchedulerBackend:
         self.course_id_to_same_time_course_ids_map = {}
         self.current_result_index = 0
         self.something_changed = True
+        self.current_class_code = ''
+        self.class_code_to_class_ids_map.clear()
+        self.added_classes.clear()
+        self.auto_suggest_trie.clear()
 
 
     def save_state(self, file_addr):
@@ -74,6 +84,8 @@ class CourseSchedulerBackend:
             'results': self.results,
             'current_result_index': self.current_result_index,
             'something_changed': self.something_changed,
+            'current_class_code': self.current_class_code,
+            'added_classes': dict(self.added_classes)
         }
     
         with open(file_addr, 'w') as f:
@@ -93,6 +105,10 @@ class CourseSchedulerBackend:
             self.current_result_index = state.get('current_result_index', 0)
             self.something_changed = state.get('something_changed', True)
             self.excluded_time_blocks = set([tuple(int(item) for item in lst) for lst in state.get('excluded_time_blocks', [])])
+            self.current_class_code = state.get('current_class_code', '')
+            self.added_classes = SortedDict(state.get('added_classes', {}))
+            self.auto_suggest_trie.load_values(self.added_classes.keys())
+    
 
     def get_selected_class_code_names_from_slot_list(self):
         self.selected_class_code_names = [
@@ -118,9 +134,9 @@ class CourseSchedulerBackend:
         
         # Filter not aplicable courses and duplicates in terms of day and time
         course_id_to_same_time_course_ids_map = {}
-        courses = [[self.class_id_to_course_ids_map.get(class_id, []) for class_id in slot] for slot in self.selected_class_ids]
-        courses = [[course_id for course_ids in slot for course_id in course_ids] for slot in courses]
-        courses = [[course_id for course_id in course_ids if self.courses[course_id][4] > 0] for course_ids in courses]
+        courses = [[course_id for class_id in slot
+                    for course_id in self.class_id_to_course_ids_map.get(class_id, []) if self.courses[course_id][4] > 0]
+                   for slot in self.selected_class_ids]
         courses = [self._exclude_same_time_courses(course_ids, course_id_to_same_time_course_ids_map) for course_ids in courses]
         course_id_to_same_time_course_ids_map = {course_id: sorted(same_time_ids, key=lambda item: self.courses[item][4], reverse=True)
                                                 for course_id, same_time_ids in course_id_to_same_time_course_ids_map.items()}
@@ -271,6 +287,9 @@ class CourseSchedulerBackend:
             c_lst[2] = [] if c[3] == '' else [[or_item for or_item in or_group.split('|')] for or_group in c[3].split('&')]
             self.classes[c[0]] = c_lst
             self.class_code_name_to_id_map[c[1]] = c[0]
+            # For example class_code = EHB, class_number = 335E
+            class_code, class_number = c[1].split(' ')
+            self.class_code_to_class_ids_map.setdefault(class_code, SortedDict())[class_number] = c[0]
 
 #################################################################################################
 #       PRIVATE FUNCTIONS                                                                       #

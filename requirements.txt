@@ -1,0 +1,5 @@
+pyqt5
+bs4
+requests
+opencv-python-headless
+sortedcontainers
