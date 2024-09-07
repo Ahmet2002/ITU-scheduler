@@ -21,3 +21,10 @@ __pycache__/
 # Ignore IDE-specific files
 .vscode/
 .idea/
+.DS_Store
+
+# Ignore specific Directories
+output_images/
+tests/
+
+# Ignore specific files
