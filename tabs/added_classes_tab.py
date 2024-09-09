@@ -31,11 +31,11 @@ class AddedClassesTab(QWidget):
         class_code_name = self.backend.classes[class_id][0]
         self.backend.added_classes[class_code_name] = class_id
         self.added_classes_list.update_list(self.backend.added_classes.values())
-        self.backend.auto_suggest_trie.add(class_code_name)
+        self.backend.insert_to_added_classes_model(class_id)
     
     def remove_class(self, class_id):
         class_code_name = self.backend.classes[class_id][0]
         self.backend.added_classes.pop(class_code_name)
         self.added_classes_list.update_list(self.backend.added_classes.values())
-        self.backend.auto_suggest_trie.remove(class_code_name)
+        self.backend.remove_from_added_classes_model(class_id)
 

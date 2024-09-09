@@ -1,8 +1,6 @@
-from PyQt5.QtWidgets import QMessageBox
-from PyQt5.QtCore import QTime
+from PyQt5.QtCore import QTime, QStringListModel
 from bs4 import BeautifulSoup
 from sortedcontainers import SortedDict
-from utils.trie import Trie
 import json, os
 
 class CourseSchedulerBackend:
@@ -33,7 +31,7 @@ class CourseSchedulerBackend:
         self.class_code_to_class_ids_map = SortedDict()
         self.current_class_code = None
         self.added_classes = SortedDict()
-        self.auto_suggest_trie = Trie()
+        self.added_classes_model = QStringListModel()
 
 
     def _config(self):
@@ -53,6 +51,7 @@ class CourseSchedulerBackend:
         self.ERROR_TIME_COLLISION = 'Time block must not collide with the previous time blocks'
         self.ERROR_CLASS_ALLREADY_EXIST = 'Class already exists.'
         self.ERROR_NOT_MULTIPLE_OF_RESOLUTION = f'Time Exclusion Block show be multiple of {self.time_resolution}'
+        self.ERROR_PREREQS_NOT_SATISFIED = lambda class_id: f'Prerequisites are not satisfied.\nProblematic class is:{self.classes[class_id][0]}\nRequired Prerequisites are: {' and '.join('('+' or '.join(or_group)+')' for or_group in self.classes[class_id][2])}'
         self.ERROR_MAJOR_NOT_SELECTED = 'Major is not selected.\nPlease first select a major.'
         self.MESSAGE_CONFIRM_MAJOR_UPDATE = 'Updating the major will reset the selected classes\nredownload the related prerequisites and\nrefetch the related data from the database.\nDo you want to proceed?'
         self.MESSAGE_CONFIRM_DB_UPDATE = "Updating the database may take some time.\nAnd it will also reset the program state.\nSo don't use this button too frequently.\nDo you want to proceed?"
@@ -70,7 +69,6 @@ class CourseSchedulerBackend:
         self.current_class_code = ''
         self.class_code_to_class_ids_map.clear()
         self.added_classes.clear()
-        self.auto_suggest_trie.clear()
 
 
     def save_state(self, file_addr):
@@ -107,7 +105,6 @@ class CourseSchedulerBackend:
             self.excluded_time_blocks = set([tuple(int(item) for item in lst) for lst in state.get('excluded_time_blocks', [])])
             self.current_class_code = state.get('current_class_code', '')
             self.added_classes = SortedDict(state.get('added_classes', {}))
-            self.auto_suggest_trie.load_values(self.added_classes.keys())
     
 
     def get_selected_class_code_names_from_slot_list(self):
@@ -129,13 +126,12 @@ class CourseSchedulerBackend:
         # Check for prerequisites
         is_prereq_ok, problematic_class_id = self._prerequisites_ok()
         if not is_prereq_ok:
-            self.parent.show_warning(f'Prerequisites are not satisfied.\nProblematic class is {self.classes[problematic_class_id][0]}')
+            self.parent.show_warning(self.ERROR_PREREQS_NOT_SATISFIED(class_id=problematic_class_id))
             return
         
         # Filter not aplicable courses and duplicates in terms of day and time
         course_id_to_same_time_course_ids_map = {}
-        courses = [[course_id for class_id in slot
-                    for course_id in self.class_id_to_course_ids_map.get(class_id, []) if self.courses[course_id][4] > 0]
+        courses = [[course_id for class_id in slot for course_id in self.class_id_to_course_ids_map.get(class_id, [])]
                    for slot in self.selected_class_ids]
         courses = [self._exclude_same_time_courses(course_ids, course_id_to_same_time_course_ids_map) for course_ids in courses]
         course_id_to_same_time_course_ids_map = {course_id: sorted(same_time_ids, key=lambda item: self.courses[item][4], reverse=True)
@@ -226,6 +222,24 @@ class CourseSchedulerBackend:
     def remove_class_option(self, class_code_name):
         self.selected_class_code_names_set.remove(class_code_name)
         self.something_changed = True
+
+    def populate_model_with_added_classes(self):
+        lst = [self.classes[class_id][0]+'-'+self.classes[class_id][1] for class_id in self.added_classes.values()]
+        self.added_classes_model.setStringList(lst)
+    
+    def insert_to_added_classes_model(self, class_id):
+        class_items = self.classes[class_id]
+        index = self.added_classes.bisect_left(class_items[0])
+        lst = self.added_classes_model.stringList()
+        lst.insert(index, class_items[0] + '-' + class_items[1])
+        self.added_classes_model.setStringList(lst)
+    
+    def remove_from_added_classes_model(self, class_id):
+        class_code = self.classes[class_id][0]
+        index = self.added_classes.bisect_left(class_code)
+        lst = self.added_classes_model.stringList()
+        lst.pop(index)
+        self.added_classes_model.setStringList(lst)
 
     def debug_course(self, course):
         print('*' * 30)

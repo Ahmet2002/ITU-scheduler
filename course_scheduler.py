@@ -180,7 +180,7 @@ class CourseScheduler(QMainWindow):
         self.update_major_id_and_dropdown(self.backend.student_major_id)
 
     def calculate_combinations(self):
-        self.tabs.setCurrentIndex(1)
+        self.tabs.setCurrentIndex(3)
         if not self.backend.something_changed:
             self.show_warning(self.backend.MESSAGE_NOTHING_CHANGED)
             return

@@ -23,7 +23,7 @@ class ProgressDialog(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
         self.parent = parent
-        self.status_messages = ['Finished', 'Connection Error Occured', 'Update Cancelled']
+        self.status_messages = ['Finished', 'An Error Occured\nTry again later\nOr check update_database.py', 'Update Cancelled']
         self.allow_close = False
         self.init_UI()
 

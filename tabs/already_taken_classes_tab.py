@@ -2,6 +2,15 @@ from PyQt5.QtWidgets import (QPushButton, QVBoxLayout,
 QHBoxLayout,QLabel, QLineEdit, QListWidget, QListWidgetItem, QWidget)
 
 class AlreadyTakenClassesTab(QWidget):
+    base_style = """
+            QPushButton {
+                border: 2px solid black;
+                border-radius: 5px;
+                padding: 5px;
+                color: black;
+                background-color: #ff7373;
+            }
+            """
     def __init__(self, parent, backend):
         super().__init__(parent)
         layout = QVBoxLayout()
@@ -21,6 +30,11 @@ class AlreadyTakenClassesTab(QWidget):
         self.class_list_widget = QListWidget(self)
         layout.addWidget(self.class_list_widget)
 
+        clear_btn = QPushButton('Clear', self)
+        clear_btn.setStyleSheet(self.base_style)
+        clear_btn.clicked.connect(self.clear_classes)
+        layout.addWidget(clear_btn)
+
         self.setLayout(layout)
         self.load_classes()
 
@@ -32,28 +46,57 @@ class AlreadyTakenClassesTab(QWidget):
 
     def add_class_item(self, class_code):
         item = QListWidgetItem(self.class_list_widget)
-        
+
         # Create a QWidget to hold the layout for class code and remove button
-        item_widget = QWidget()
-        h_layout = QHBoxLayout()
-
-        class_label = QLabel(class_code)
-        remove_btn = QPushButton("Remove")
-        remove_btn.clicked.connect(lambda: self.remove_class(item, class_code))
-
-        h_layout.addWidget(class_label)
-        h_layout.addWidget(remove_btn)
-
-        # Set the layout to the widget and assign the widget to the item
-        item_widget.setLayout(h_layout)
+        item_widget = ClassRow(self.class_list_widget, self.backend, class_code, item)
         item.setSizeHint(item_widget.sizeHint())
+        self.class_list_widget.addItem(item)
         self.class_list_widget.setItemWidget(item, item_widget)
 
-    def remove_class(self, item, class_code):
-        self.backend.remove_from_allready_taken_class_codes(class_code)
-        self.class_list_widget.takeItem(self.class_list_widget.row(item))
-
+    def clear_classes(self):
+        i = self.class_list_widget.count() - 1
+        while i > -1:
+            item = self.class_list_widget.item(i)
+            widget = self.class_list_widget.itemWidget(item)
+            self.backend.remove_from_allready_taken_class_codes(widget.class_code)
+            widget.deleteLater()
+            self.class_list_widget.takeItem(i)
+            i -= 1
 
     def load_classes(self):
         for class_code in self.backend.allready_taken_class_codes:
             self.add_class_item(class_code)
+
+class ClassRow(QWidget):
+    base_style = """
+            QPushButton {
+                border: 2px solid black;
+                border-radius: 5px;
+                padding: 5px;
+                color: black;
+                background-color: #ff7373;
+            }
+            """
+    def __init__(self, parent, backend, class_code, item_ptr):
+        super().__init__(parent)
+        self.backend = backend
+        self.parent = parent
+        self.class_code = class_code
+        self.item_ptr = item_ptr
+        self.layout = QHBoxLayout()
+        self.setLayout(self.layout)
+        self.init_UI()
+    
+    def init_UI(self):
+        class_label = QLabel(self.class_code)
+        remove_btn = QPushButton("Remove")
+        remove_btn.clicked.connect(self.remove_class)
+        remove_btn.setFixedWidth(100)
+        remove_btn.setStyleSheet(self.base_style)
+        self.layout.addWidget(class_label)
+        self.layout.addWidget(remove_btn)
+
+    def remove_class(self):
+        self.backend.remove_from_allready_taken_class_codes(self.class_code)
+        self.parent.takeItem(self.parent.row(self.item_ptr))
+        self.deleteLater()

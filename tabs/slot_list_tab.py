@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QPushButton, QLabel,
-QListWidgetItem, QListWidget, QVBoxLayout, QLineEdit)
+QListWidgetItem, QListWidget, QVBoxLayout, QComboBox)
 
 class SlotListTab(QWidget):
     def __init__(self, parent, backend):
@@ -7,6 +7,7 @@ class SlotListTab(QWidget):
         self.slot_rows = []
         self.parent = parent
         self.backend = backend
+        self.backend.populate_model_with_added_classes()
         self.selected_class_code_names = self.backend.selected_class_code_names
         self.slot_list = None
         self.total_slot_limit = self.backend.total_slot_limit
@@ -64,21 +65,30 @@ class SlotRow(QWidget):
 
     def init_ui(self, class_options):
         self.remove_slot_btn = QPushButton('X')
-        self.remove_slot_btn.setFixedSize(100, 30)
+        self.remove_slot_btn.setFixedSize(30, 30)
         self.remove_slot_btn.clicked.connect(lambda: self.parent.remove_slot_row(self.slot_index))
+        self.remove_slot_btn.setStyleSheet("""
+            QPushButton {
+                border: 2px solid black;
+                border-radius: 15px;
+                background-color: #ff7373;
+                color: black
+            }
+        """)
 
         self.index_label = QLabel(f"Slot {self.slot_index}")
 
-        self.option_input = QLineEdit()
-        self.option_input.setFixedSize(100, 30)
+        self.class_dropdown = QComboBox(self)
+        self.class_dropdown.setModel(self.backend.added_classes_model)
+        self.class_dropdown.setFixedWidth(100)
 
         self.add_option_btn = QPushButton('Add')
-        self.add_option_btn.setFixedSize(100, 30)
-        self.add_option_btn.clicked.connect(lambda: self.add_option(self.option_input.text().strip().upper()))
+        self.add_option_btn.setFixedWidth(100)
+        self.add_option_btn.clicked.connect(lambda: self.add_option(self.class_dropdown.currentText().split('-')[0]))
 
         self.layout.addWidget(self.remove_slot_btn)
         self.layout.addWidget(self.index_label)
-        self.layout.addWidget(self.option_input)
+        self.layout.addWidget(self.class_dropdown)
         self.layout.addWidget(self.add_option_btn)
 
         # Add a stretchable space to fill remaining space
@@ -120,12 +130,13 @@ class SlotOption(QPushButton):
         self.setFixedSize(100, 30)  # Example size, adjust as needed
         self.setStyleSheet("""
             QPushButton {
-                border: 2px solid #0078D7;
+                border: 2px solid black;
                 border-radius: 5px;
-                background-color: #0000FF;
+                background-color: #bada55;
                 padding: 5px;
+                color: black
             }
             QPushButton:hover {
-                background-color: #00FF00;
+                background-color: #ff7373;
             }
         """)

@@ -27,7 +27,7 @@ class CourseScraper:
         self.max_class_day_count = 3
         self.prerequisites_url = 'https://www.sis.itu.edu.tr/TR/ogrenci/lisans/onsartlar/onsartlar.php'
         self.SUCCESS = 0
-        self.ERROR_INVALID_STATUS_CODE = 1
+        self.ERROR = 1
         self.CANCELLED = 2
         self.days = {
             'Monday': 1,
@@ -99,31 +99,41 @@ class CourseScraper:
             post_response = session.post("https://obs.itu.edu.tr/public/DersProgram/DersProgramSearch", data=form_data)
             if post_response.status_code != 200:
                 self.logger.debug(f'Invalid Response, status code: {post_response.status_code}')
-                return self._reset_state_and_return(self.ERROR_INVALID_STATUS_CODE)
+                return self._reset_state_and_return(self.ERROR)
 
-            data = json.loads(post_response.text)
+            try:
+                data = json.loads(post_response.text)
 
-            # Iterate over each row in the data
-            for row in data:
-                if not self._row_ok(row):
-                    continue
-                
-                class_id = self.class_code_name_map.get(row['dersKodu'])
-                if class_id is None:
-                    class_id = self._get_new_class_id(row['dersKodu'], row['dersAdi'])
-                professor_id = self._get_professor_id(row['adSoyad'])
-                time_tuples = self._parse_day_and_time(row['gunAdiEN'], row['baslangicSaati'])
-                
-                # Append the data to a list
-                self.course_list.append([
-                    row['crn'],
-                    professor_id,
-                    class_id,
-                    '&'.join(','.join(str(time_item) for time_item in time_tuple) for time_tuple in time_tuples),
-                    int(row['kontenjan']) - int(row['ogrenciSayisi'])
-                ])
-                # COURSE_ID IS 1 INDEXED SO DONT SUBTRACT 1
-                self._save_major_and_course_ids(row['sinifProgram'], course_id=len(self.course_list)) # returns major ids as a string not as a list
+                # Iterate over each row in the data
+                for row in data:
+                    if not self._row_ok(row):
+                        continue
+                    
+                    class_id = self.class_code_name_map.get(row['dersKodu'])
+                    if class_id is None:
+                        class_id = self._get_new_class_id(row['dersKodu'], row['dersAdi'])
+                    professor_id = self._get_professor_id(row['adSoyad'])
+                    qouta = int(row['kontenjan']) - int(row['ogrenciSayisi'])
+                    save = True
+                    if qouta <= 0:
+                        save = False
+
+                    
+                    if save:
+                        time_tuples = self._parse_day_and_time(row['gunAdiEN'], row['baslangicSaati'])
+                        # Append the data to a list
+                        self.course_list.append([
+                            row['crn'],
+                            professor_id,
+                            class_id,
+                            time_tuples,
+                            qouta
+                        ])
+                        
+                    # COURSE_ID IS 1 INDEXED SO DONT SUBTRACT 1
+                    self._save_major_and_course_ids(row['sinifProgram'], course_id=len(self.course_list), save=save) # returns major ids as a string not as a list
+            except Exception:
+                return self._reset_state_and_return(self.ERROR)
             
             progress_signal.emit(i)
             i += 1
@@ -207,7 +217,7 @@ class CourseScraper:
         self.class_iter += 1
         return ret
 
-    def _save_major_and_course_ids(self, major_restriction, course_id):
+    def _save_major_and_course_ids(self, major_restriction, course_id, save=True):
         majors = [major.strip() for major in major_restriction.split(',')]
 
         for major in majors:
@@ -218,7 +228,10 @@ class CourseScraper:
                     major
                 ])
                 self.major_iter += 1
-            self.major_id_to_course_ids_map.setdefault(self.major_map[major], []).append(course_id)
+        
+        if save:
+            for major in majors:
+                self.major_id_to_course_ids_map.setdefault(self.major_map[major], []).append(course_id)
 
     def _parse_prerequisite_class_code_names(self, prerequisites):
         check = re.search(r'\s+ve\s*', prerequisites)
@@ -239,7 +252,7 @@ class CourseScraper:
         time_tuples = []
         for i in range(len(day_values)):
             time_tuples.append((day_values[i], time_values[2 * i], time_values[2 * i + 1]))
-        return time_tuples
+        return '&'.join(','.join(str(time_item) for time_item in time_tuple) for time_tuple in time_tuples)
     
     def _table_exists(self, table_name):
         cursor = self.conn.cursor()
@@ -272,28 +285,31 @@ class CourseScraper:
 
             if response.status_code != 200:
                 print(f'Invalid Response for prerequisites for {class_code}, status code: {response.status_code}')
-                return self.ERROR_INVALID_STATUS_CODE
+                return self.ERROR
 
-            soup = BeautifulSoup(response.content, 'html.parser')
+            try:
+                soup = BeautifulSoup(response.content, 'html.parser')
 
-            table = soup.find('table')
-            if table is None:
-                continue
-
-            for row in table.find_all('tr'):
-                columns = row.find_all('td')
-                if columns == []:
+                table = soup.find('table')
+                if table is None:
                     continue
 
-                not_parsed_prerequisites = columns[2].get_text(separator=' ')
-                parsed_prerequisites = self._parse_prerequisite_class_code_names(not_parsed_prerequisites)
-                class_list.append([
-                    self.class_iter,
-                    columns[0].text.strip(),
-                    columns[1].text.strip(),
-                    '&'.join('|'.join(or_group) for or_group in parsed_prerequisites)
-                ])
-                self.class_iter += 1
+                for row in table.find_all('tr'):
+                    columns = row.find_all('td')
+                    if columns == []:
+                        continue
+
+                    not_parsed_prerequisites = columns[2].get_text(separator=' ')
+                    parsed_prerequisites = self._parse_prerequisite_class_code_names(not_parsed_prerequisites)
+                    class_list.append([
+                        self.class_iter,
+                        columns[0].text.strip(),
+                        columns[1].text.strip(),
+                        '&'.join('|'.join(or_group) for or_group in parsed_prerequisites)
+                    ])
+                    self.class_iter += 1
+            except Exception:
+                return self.ERROR
             
             progress_signal.emit(i)
             i += 1
