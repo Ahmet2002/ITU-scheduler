@@ -41,7 +41,7 @@ class CourseSchedulerBackend:
         self.day_start_time_minutes = self._time_to_minutes(self.day_start_time) # 8:30
         self.day_end_time_minutes = self._time_to_minutes(self.day_end_time) # 17:30
         self.total_slot_limit = 15
-        self.total_options_count_limit = 7
+        self.total_options_count_limit = 8
         self.state_file_addr = 'state.json'
         self.output_image_directory_path = 'output_images'
         # Error Messages

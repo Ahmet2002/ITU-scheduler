@@ -7,13 +7,15 @@ import os
 
 
 class TimeTableTab(QWidget):
+    days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+    colors = ['#66cdaa', '#ffd700', '#e6e6fa', '#ffa500', '#40e0d0',
+            '#ff7373', '#d3ffce', '#afeeee', '#faebd7', '#bada55',
+            '#c39797', '#c0d6e4', '#ffc0cb', '#fff68f']
     def __init__(self, parent, backend):
         super().__init__(parent=parent)
         self.parent = parent
         self.backend = backend
-        self.days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-        self.colors = ['#065535', '#ffd700', '#e6e6fa', '#ffa500', '#40e0d0',
-                        '#ff7373', '#d3ffce', '#008080', '#faebd7', '#bada55']
+
         self.color_count = len(self.colors)
         self.courses_widgets = []
         self.last_label_index = 0
@@ -24,7 +26,6 @@ class TimeTableTab(QWidget):
         self.start_time_minutes = self._time_to_minutes(self.day_start_time)
         self.end_time_minutes = self._time_to_minutes(self.day_end_time)
         self._get_times()
-        
         self.tab_layout = QVBoxLayout()
         self.setLayout(self.tab_layout)
         self.init_UI()
