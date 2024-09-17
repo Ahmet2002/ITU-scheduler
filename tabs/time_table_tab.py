@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QLabel,
-QVBoxLayout, QGridLayout, QComboBox, QStackedLayout, QPushButton, QSpinBox)
+QVBoxLayout, QGridLayout, QComboBox, QStackedLayout,
+QPushButton, QSpinBox, QScrollArea)
 from PyQt5.QtCore import QTime, Qt
 from PyQt5.QtGui import QFont
 from datetime import datetime
@@ -129,7 +130,10 @@ class TimeTableTab(QWidget):
 
         self.table_widget = QWidget()
         self.table_widget.setLayout(self.table_layout)
-        self.tab_layout.addWidget(self.table_widget)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(self.table_widget)
+        self.tab_layout.addWidget(scroll_area)
 
     def _create_nav_layout(self):
         nav_layout = QHBoxLayout()

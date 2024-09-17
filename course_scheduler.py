@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
      QMainWindow, QPushButton, QComboBox,
     QVBoxLayout, QHBoxLayout, QWidget,QMessageBox,
-    QTabWidget
+    QTabWidget, QApplication
 )
 from update_database import CourseScraper
 from tabs.class_portfolio_tab import ClassPortfolioTab
@@ -32,6 +32,9 @@ class CourseScheduler(QMainWindow):
             self.backend.load_data()
             self.backend.fetch_major_specific_data()
         self.setWindowTitle("Course Scheduler")
+        screen_geometry = QApplication.desktop().availableGeometry()
+        self.setMaximumSize(screen_geometry.width(), screen_geometry.height())
+        self.resize(int(screen_geometry.width() * 0.8), screen_geometry.height())
         self.layout = QVBoxLayout()
         container = QWidget()
         container.setLayout(self.layout)

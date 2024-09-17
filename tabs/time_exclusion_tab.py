@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import (QPushButton, QComboBox,QVBoxLayout,
-QHBoxLayout,QLabel, QTimeEdit, QSizePolicy, QGridLayout, QWidget)
+QHBoxLayout,QLabel, QTimeEdit, QSizePolicy, QGridLayout, QWidget,
+QScrollArea)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
@@ -84,7 +85,12 @@ class TimeExclusionTab(QWidget):
         
         self.last_label_index = self.table_layout.count()
 
-        self.tab_layout.addLayout(self.table_layout)
+        table_widget = QWidget()
+        table_widget.setLayout(self.table_layout)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setWidget(table_widget)
+        self.tab_layout.addWidget(scroll_area)
 
     def _load_time_blocks(self):
         for time_tuple in self.backend.excluded_time_blocks:
