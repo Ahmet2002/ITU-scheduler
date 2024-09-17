@@ -123,11 +123,7 @@ class CourseSchedulerBackend:
         self.get_selected_class_code_names_from_slot_list()
         self.selected_class_ids = [[self.class_code_name_to_id_map[class_code_name] for class_code_name in slot] for slot in self.selected_class_code_names]
 
-        # Check for prerequisites
-        is_prereq_ok, problematic_class_id = self._prerequisites_ok()
-        if not is_prereq_ok:
-            self.parent.show_warning(self.ERROR_PREREQS_NOT_SATISFIED(class_id=problematic_class_id))
-            return
+        # Prerequisites are allready checked at the class addition stage 
         
         # Filter not aplicable courses and duplicates in terms of day and time
         course_id_to_same_time_course_ids_map = {}
@@ -315,14 +311,14 @@ class CourseSchedulerBackend:
             return False
         return True
 
-    def _prerequisites_ok(self):
-        class_ids = [class_id for class_slot in self.selected_class_ids for class_id in class_slot]
+    # def _prerequisites_ok(self):
+    #     class_ids = [class_id for class_slot in self.selected_class_ids for class_id in class_slot]
 
-        for class_id in class_ids:
-            if not self._check_prerequisites_for_class(class_id):
-                return False, class_id # returns false and the problematic class id
+    #     for class_id in class_ids:
+    #         if not self.check_prerequisites_for_class(class_id):
+    #             return False, class_id # returns false and the problematic class id
         
-        return True, 0 # returns 0 as an invalid value for class id because no class is problematic
+    #     return True, 0 # returns 0 as an invalid value for class id because no class is problematic
 
     # Resturns a new list that same time courses are excluded
     def _exclude_same_time_courses(self, old_list, course_id_to_same_time_course_ids_map):
@@ -405,11 +401,12 @@ class CourseSchedulerBackend:
         return True
 
 
-    def _check_prerequisites_for_class(self, class_id):
+    def check_prerequisites_for_class(self, class_id):
         prerequisites = self.classes[class_id][2]
 
         for or_class_codes in prerequisites:
             if not any(class_code in self.allready_taken_class_codes for class_code in or_class_codes):
+                self.parent.show_warning(self.ERROR_PREREQS_NOT_SATISFIED(class_id=class_id))
                 return False
         
         return True

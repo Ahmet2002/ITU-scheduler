@@ -128,7 +128,6 @@ class CourseScheduler(QMainWindow):
         self.worker.start()
         self.progress_dialog.show()
 
-
     def _reset_program_state(self):
         self.initial_state = False
         self.backend.reset_state()
@@ -138,14 +137,15 @@ class CourseScheduler(QMainWindow):
         self.update_major_dropdown()
         self.time_table_tab.update_time_table()
         self.time_table_tab.show_current_result()
+        self.added_classes_tab.added_classes_list.clear_list()
+        self.backend.populate_model_with_added_classes()
+        self.class_portfolio_tab.update_portfolio()
 
     def handle_update_database_finish(self, return_code):
         self.worker.quit()
         self.worker.wait()
         if return_code == self.scraper.SUCCESS:
             self._reset_program_state()
-            self.added_classes_tab.added_classes_list.clear_list()
-            self.class_portfolio_tab.update_portfolio()
         # if the program is in initial state and
         # database exists in the db_path it is deleted
         elif self.initial_state and os.path.exists(self.db_path):

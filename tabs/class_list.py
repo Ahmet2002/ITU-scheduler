@@ -111,8 +111,10 @@ class ClassRow(QWidget):
 
     def handle_add_or_remove(self):
         if self.button_state == self.ADD_STATE:
-            self.parent.added.emit(self.class_id)
+            if self.backend.check_prerequisites_for_class(self.class_id):
+                self.parent.added.emit(self.class_id)
+                self.toggle_button()
         else:
             self.parent.removed.emit(self.class_id)
-        self.toggle_button()
+            self.toggle_button()
             
