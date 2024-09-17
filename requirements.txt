@@ -3,3 +3,4 @@ bs4
 requests
 opencv-python-headless
 sortedcontainers
+qdarkstyle
