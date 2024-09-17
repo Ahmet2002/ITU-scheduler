@@ -1,5 +1,7 @@
 from bs4 import BeautifulSoup
 import sqlite3, json, re, logging, requests
+from PyQt5.QtCore import pyqtSignal
+
 
 
 # onsart linki
@@ -90,19 +92,20 @@ class CourseScraper:
             if self.cancelled:
                 return self._reset_state_and_return(self.CANCELLED)
             
-            form_data = {
-                "ProgramSeviyeTipiAnahtari": "LS",  # Example: 'LS' for Lisans
-                "dersBransKoduId": class_code_id,  # Example: '196' for EHB (Electronics Classes)
-                "__RequestVerificationToken": token  # Include the token
-            }
+            # form_data = {
+            #     "ProgramSeviyeTipiAnahtari": "LS",  # Example: 'LS' for Lisans
+            #     "dersBransKoduId": class_code_id,  # Example: '196' for EHB (Electronics Classes)
+            #     "__RequestVerificationToken": token  # Include the token
+            # }
 
-            post_response = session.post("https://obs.itu.edu.tr/public/DersProgram/DersProgramSearch", data=form_data)
+            post_response = session.get("https://obs.itu.edu.tr/public/DersProgram/DersProgramSearch?" + 
+            f"ProgramSeviyeTipiAnahtari=LS&dersBransKoduId={class_code_id}&__RequestVerificationToken={token}")
             if post_response.status_code != 200:
-                self.logger.debug(f'Invalid Response, status code: {post_response.status_code}')
+                print(f'Invalid Response, status code: {post_response.status_code}')
                 return self._reset_state_and_return(self.ERROR)
 
             try:
-                data = json.loads(post_response.text)
+                data = json.loads(post_response.text)['dersProgramList']
 
                 # Iterate over each row in the data
                 for row in data:
@@ -392,11 +395,14 @@ class CourseScraper:
         self.conn.commit()
 
 
-# if __name__ == '__main__':
-#     logger = logging.getLogger()
-#     conn = sqlite3.connect('courses.db')
-#     scraper = CourseScraper(logger, conn)
-#     scraper.update_database()
+if __name__ == '__main__':
+    logger = logging.getLogger()
+    progress_updated = pyqtSignal(int)  # Signal to update progress bar
+    scraper = CourseScraper(logger)
+    scraper.conn = sqlite3.connect('courses.db')
+    return_code = scraper.update_database(progress_updated)
+    scraper.conn.close()
+    print(f'return code: {return_code}')
 
 #     # BEFORE DEBUGGING
 #     # CHECK IF _reset_state_and_return IN THE LAST PART OF UPDATE_DATA_BASE()
