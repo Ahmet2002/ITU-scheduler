@@ -80,7 +80,7 @@ class SlotRow(QWidget):
 
         self.class_dropdown = QComboBox(self)
         self.class_dropdown.setModel(self.backend.added_classes_model)
-        self.class_dropdown.setFixedWidth(100)
+        self.class_dropdown.setFixedWidth(200)
 
         self.add_option_btn = QPushButton('Add')
         self.add_option_btn.setFixedWidth(100)
