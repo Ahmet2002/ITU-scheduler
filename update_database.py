@@ -49,6 +49,8 @@ class CourseScraper:
         'NTH', 'PAZ', 'PEM', 'PET', 'PHE', 'PHY', 'RES', 'SBP', 'SAO', 'SES', 'STA',
         'STI', 'TDW', 'TEB', 'TEK', 'TEL', 'TER', 'TES', 'THO', 'TUR', 'UCK', 'UZB',
         'VBA', 'YTO', 'YZV']
+        # CLASS CODE IDS FOR POST REQUEST FOR SCRAPING INDIVIDUAL WEB PAGES
+        # THEY MAY CHANGE IN THE FUTURE SO YOU MAY HAVE TO UPDATE THEM
         self.class_code_ids = ['42', '227', '305', '302', '43', '200', '149', '165', '38', '30', '3', '180', '155', '127',
         '304', '7', '169', '137', '81', '142', '245', '146', '208', '168', '243', '10', '163', '181', '44', '32',
         '141', '232', '154', '289', '294', '297', '182', '196', '241', '39', '59', '2', '1', '178', '15', '183', 
@@ -73,8 +75,7 @@ class CourseScraper:
         return self.SUCCESS
 
     def update_database(self, progress_signal):
-        # CLASS CODE IDS FOR POST REQUEST FOR SCRAPING INDIVIDUAL WEB PAGES
-        # THEY MAY CHANGE IN THE FUTURE SO YOU MAY HAVE TO UPDATE THEM
+        self._reset_state()
         return_code = self.fetch_classes(progress_signal)
         if return_code != self.SUCCESS:
             return self._reset_state_and_return(return_code)
@@ -181,7 +182,7 @@ class CourseScraper:
             return False
         return True
     
-    def _reset_state_and_return(self, return_id):
+    def _reset_state(self):
         self.course_list = []
         self.class_list = []
         self.professor_list = []
@@ -195,6 +196,9 @@ class CourseScraper:
         self.professor_iter = 1
         self.major_iter = 1
         self.cancelled = False
+
+    def _reset_state_and_return(self, return_id):
+        self._reset_state()
         return return_id
 
     def _get_professor_id(self, instructor):
@@ -228,7 +232,8 @@ class CourseScraper:
                 self.major_map[major] = self.major_iter
                 self.majors_list.append([
                     self.major_iter,
-                    major
+                    major,
+                    ''
                 ])
                 self.major_iter += 1
         
@@ -354,8 +359,12 @@ class CourseScraper:
                             VALUES (?, ?)''', self.professor_list)
         self.conn.commit()
 
+        # Starts from 1 goes to len of self.majors_list 
+        # for major_id in range(1, len(self.majors_list) + 1):
+        #     self.majors_list[major_id - 1].append(','.join(str(course_id_int) for course_id_int in self.major_id_to_course_ids_map.get(major_id, [])))
+
         for key, value in self.major_id_to_course_ids_map.items():
-            self.majors_list[key - 1].append(','.join(str(course_id_int) for course_id_int in value))
+            self.majors_list[key - 1][2] = ','.join(str(course_id_int) for course_id_int in value)
 
         cursor.executemany('''INSERT INTO Majors (major_id, major_name, course_ids)
                             VALUES (?, ?, ?)''', self.majors_list)
@@ -395,12 +404,17 @@ class CourseScraper:
         self.conn.commit()
 
 
+
 if __name__ == '__main__':
+    class DummyClass:
+        def emit(self, num):
+            pass
+
     logger = logging.getLogger()
-    progress_updated = pyqtSignal(int)  # Signal to update progress bar
+    dummy_object = DummyClass()  # Signal to update progress bar
     scraper = CourseScraper(logger)
     scraper.conn = sqlite3.connect('courses.db')
-    return_code = scraper.update_database(progress_updated)
+    return_code = scraper.update_database(dummy_object)
     scraper.conn.close()
     print(f'return code: {return_code}')
 
