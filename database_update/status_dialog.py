@@ -6,6 +6,7 @@ import sys, time, sqlite3
 class Worker(QThread):
     progress_updated = pyqtSignal(int)  # Signal to update progress bar
     thread_returned = pyqtSignal(int)
+    update_progress_bar = pyqtSignal(int)
 
     def __init__(self, parent, db_path):
         super().__init__(parent)
@@ -14,7 +15,17 @@ class Worker(QThread):
 
     def run(self):
         self.scraper.conn = sqlite3.connect(self.db_path)
-        return_code = self.scraper.update_database(self.progress_updated)
+        return_code = self.scraper.SUCCESS
+        try:
+            self.scraper.get_class_code_ids_and_token()
+            self.update_progress_bar.emit(len(self.scraper.class_codes)
+                                + len(self.scraper.class_code_ids))
+        except:
+            return_code = self.scraper.ERROR
+            self.update_progress_bar.emit(1)
+        
+        if return_code != self.scraper.ERROR:
+            return_code = self.scraper.update_database(self.progress_updated)
         self.scraper.conn.close()
         self.thread_returned.emit(return_code)
 
@@ -41,8 +52,7 @@ class ProgressDialog(QDialog):
         self.status_label = QLabel(self)
         self.status_label.setText('Updating Database...')
         self.progress_bar = QProgressBar(self)
-        self.progress_bar.setRange(0, len(self.parent.scraper.class_codes)
-                                + len(self.parent.scraper.class_code_ids))
+        self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
 
         button_layout = QHBoxLayout()
@@ -59,6 +69,9 @@ class ProgressDialog(QDialog):
         self.layout.addLayout(button_layout)
 
         self.setLayout(self.layout)
+    
+    def update_progress_bar(self, range):
+        self.progress_bar.setRange(0, range)
 
     def update_progress(self, value):
         self.progress_bar.setValue(value)

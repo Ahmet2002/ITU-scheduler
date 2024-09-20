@@ -3,7 +3,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QWidget,QMessageBox,
     QTabWidget, QApplication
 )
-from update_database import CourseScraper
+from database_update.update_database import CourseScraper
+from database_update.status_dialog import Worker, ProgressDialog
 from tabs.class_portfolio_tab import ClassPortfolioTab
 from tabs.added_classes_tab import AddedClassesTab
 from tabs.slot_list_tab import SlotListTab
@@ -11,7 +12,6 @@ from tabs.time_table_tab import TimeTableTab
 from tabs.time_exclusion_tab import TimeExclusionTab
 from tabs.already_taken_classes_tab import AlreadyTakenClassesTab
 from course_schduler_backend import CourseSchedulerBackend
-from status_dialog import Worker, ProgressDialog
 import sqlite3, logging, os
 
 class CourseScheduler(QMainWindow):
@@ -56,6 +56,7 @@ class CourseScheduler(QMainWindow):
         self.progress_dialog = ProgressDialog(self)
         self.worker.thread_returned.connect(self.handle_update_database_finish)
         self.worker.progress_updated.connect(self.progress_dialog.update_progress)
+        self.worker.update_progress_bar.connect(self.progress_dialog.update_progress_bar)
 
     def _init_control_layout(self):
         control_layout = QHBoxLayout()

@@ -1,6 +1,11 @@
 from bs4 import BeautifulSoup
 import sqlite3, json, re, logging, requests
-from PyQt5.QtCore import pyqtSignal
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import Select, WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+import time
 
 
 
@@ -23,6 +28,9 @@ class CourseScraper:
         self.class_iter = 1
         self.professor_iter = 1
         self.major_iter = 1
+        self.class_codes = []
+        self.class_code_ids = []
+        self.token = ''
         self.cancelled = False
 
     def _config(self):
@@ -38,33 +46,9 @@ class CourseScraper:
             'Thursday': 4,
             'Friday': 5
         }
-        self.class_codes = ['AKM', 'ATA', 'BED', 'BIL', 'BIO', 'BLG', 'BUS', 'CAB', 'CEV',
-        'CHZ', 'CIE', 'CMP', 'COM', 'DEN', 'DFH', 'DNK', 'DUI', 'EAS', 'EEF', 'ECO',
-        'ECN', 'EHB', 'EHN', 'EKO', 'ELE', 'ELH', 'ELK', 'END', 'ENR', 'ENT', 'ESL',
-        'ETH', 'ETK', 'EUT', 'FIZ', 'GED', 'GEM', 'GEO', 'GID', 'GMI', 'GSB', 'GUV',
-        'HUK', 'HSS', 'ICM', 'ILT', 'IML', 'ING', 'INS', 'ISE', 'ISL', 'ISH', 'ITB',
-        'JDF', 'JEF', 'JEO', 'KIM', 'KMM', 'KMP', 'KON', 'MAD', 'MAK', 'MAL', 'MAR',
-        'MAT', 'MCH', 'MEK', 'MEN', 'MET', 'MDN', 'MIM', 'MMD', 'MOD', 'MRT', 'MRE',
-        'MRT', 'MTO', 'MTH', 'MTM', 'MTR', 'MST', 'MUH', 'MUK', 'MUT', 'MUZ', 'NAE',
-        'NTH', 'PAZ', 'PEM', 'PET', 'PHE', 'PHY', 'RES', 'SBP', 'SAO', 'SES', 'STA',
-        'STI', 'TDW', 'TEB', 'TEK', 'TEL', 'TER', 'TES', 'THO', 'TUR', 'UCK', 'UZB',
-        'VBA', 'YTO', 'YZV']
-        # CLASS CODE IDS FOR POST REQUEST FOR SCRAPING INDIVIDUAL WEB PAGES
-        # THEY MAY CHANGE IN THE FUTURE SO YOU MAY HAVE TO UPDATE THEM
-        self.class_code_ids = ['42', '227', '305', '302', '43', '200', '149', '165', '38', '30', '3', '180', '155', '127',
-        '304', '7', '169', '137', '81', '142', '245', '146', '208', '168', '243', '10', '163', '181', '44', '32',
-        '141', '232', '154', '289', '294', '297', '182', '196', '241', '39', '59', '2', '1', '178', '15', '183', 
-        '179', '207', '225', '140', '164', '110', '22', '28', '226', '175', '138', '11', '74', '4', '162', '46', 
-        '176', '109', '53', '173', '31', '177', '111', '256', '41', '301', '63', '253', '112', '300', '33', '8', 
-        '153', '231', '14', '228', '255', '50', '9', '19', '18', '202', '27', '6', '125', '58', '156', '16', '12', 
-        '48', '148', '26', '160', '293', '47', '258', '5', '20', '184', '290', '150', '157', '158', '257', '143', '174', 
-        '260', '23', '199', '29', '40', '126', '128', '259', '263', '161', '151', '64', '17', '262', '147', '203', '36', 
-        '307', '237', '21', '288', '171', '124', '291', '193', '172', '37', '159', '261', '121', '13', '57', '49', '269', 
-        '129', '65', '215', '170', '34', '25', '195', '24', '306', '198', '213', '221']
 
     def trigger_cancel(self):
         self.cancelled = True
-
 
     def fetch_classes(self, progress_signal):
         if self._table_exists('Classes'):
@@ -80,27 +64,13 @@ class CourseScraper:
         if return_code != self.SUCCESS:
             return self._reset_state_and_return(return_code)
 
-        # URL of the page containing the table
-        session = requests.Session()
-        response = session.get("https://obs.itu.edu.tr/public/DersProgram")
-        soup = BeautifulSoup(response.content, "html.parser")
-
-        # Extract the verification token from the hidden input field
-        token = soup.find("input", {"name": "__RequestVerificationToken"})["value"]
-
         i = len(self.class_code_ids) + 1
         for class_code_id in self.class_code_ids:
             if self.cancelled:
                 return self._reset_state_and_return(self.CANCELLED)
-            
-            # form_data = {
-            #     "ProgramSeviyeTipiAnahtari": "LS",  # Example: 'LS' for Lisans
-            #     "dersBransKoduId": class_code_id,  # Example: '196' for EHB (Electronics Classes)
-            #     "__RequestVerificationToken": token  # Include the token
-            # }
 
-            post_response = session.get("https://obs.itu.edu.tr/public/DersProgram/DersProgramSearch?" + 
-            f"ProgramSeviyeTipiAnahtari=LS&dersBransKoduId={class_code_id}&__RequestVerificationToken={token}")
+            post_response = requests.get("https://obs.itu.edu.tr/public/DersProgram/DersProgramSearch?" + 
+            f"ProgramSeviyeTipiAnahtari=LS&dersBransKoduId={class_code_id}&__RequestVerificationToken={self.token}")
             if post_response.status_code != 200:
                 print(f'Invalid Response, status code: {post_response.status_code}')
                 return self._reset_state_and_return(self.ERROR)
@@ -108,7 +78,6 @@ class CourseScraper:
             try:
                 data = json.loads(post_response.text)['dersProgramList']
 
-                # Iterate over each row in the data
                 for row in data:
                     if not self._row_ok(row):
                         continue
@@ -197,6 +166,7 @@ class CourseScraper:
         self.major_iter = 1
         self.cancelled = False
 
+
     def _reset_state_and_return(self, return_id):
         self._reset_state()
         return return_id
@@ -279,7 +249,6 @@ class CourseScraper:
 
     
     def _download_classes_if_not_exist(self, progress_signal):
-
         class_list = []
         self.class_iter = 1
 
@@ -402,6 +371,47 @@ class CourseScraper:
             professor_name TEXT
         )''')
         self.conn.commit()
+
+    def get_class_code_ids_and_token(self):
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")  # Runs Chrome in headless mode
+        chrome_options.add_argument("--disable-gpu")  # Disable GPU hardware acceleration
+        chrome_options.add_argument("--no-sandbox")  # Bypass OS security model
+
+        driver = webdriver.Chrome(options=chrome_options)
+
+        try:
+            driver.get('https://obs.itu.edu.tr/public/DersProgram')
+
+            education_level_dropdown = Select(driver.find_element(By.ID, 'programSeviyeTipiId'))
+            education_level_dropdown.select_by_value('LS')  # 'LS' is the value for "Undergraduate"
+
+            WebDriverWait(driver, 5).until(
+                lambda d: len(d.find_elements(By.XPATH, f"//select[@id='dersBransKoduId']/option")) > 1
+            )
+
+            page_source = driver.page_source
+            soup = BeautifulSoup(page_source, 'html.parser')
+            course_code_dropdown = soup.find('select', {'id': 'dersBransKoduId'})
+            self.class_code_ids = [option['value'] for option in course_code_dropdown.find_all('option') if option['value']]
+
+            self.token = soup.find("input", {"name": "__RequestVerificationToken"})["value"]
+
+            driver.get(self.prerequisites_url)
+
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.NAME, 'derskodu'))
+            )
+            dropdown = driver.find_element(By.NAME, 'derskodu')  # or By.CSS_SELECTOR or By.XPATH
+            select = Select(dropdown)
+            options = select.options
+            self.class_codes = [option.get_attribute('value') for option in options]
+        except:
+            raise
+        finally:
+            driver.quit()
+
+
 
 
 
