@@ -51,7 +51,7 @@ class CourseSchedulerBackend:
         self.ERROR_TIME_COLLISION = 'Time block must not collide with the previous time blocks'
         self.ERROR_CLASS_ALLREADY_EXIST = 'Class already exists.'
         self.ERROR_NOT_MULTIPLE_OF_RESOLUTION = f'Time Exclusion Block show be multiple of {self.time_resolution}'
-        self.ERROR_PREREQS_NOT_SATISFIED = lambda class_id: f'Prerequisites are not satisfied.\nProblematic class is:{self.classes[class_id][0]}\nRequired Prerequisites are: {' and '.join('('+' or '.join(or_group)+')' for or_group in self.classes[class_id][2])}'
+        self.ERROR_PREREQS_NOT_SATISFIED = lambda class_id: f"Prerequisites are not satisfied.\nProblematic class is:{self.classes[class_id][0]}\nRequired Prerequisites are: {' and '.join('('+' or '.join(or_group)+')' for or_group in self.classes[class_id][2])}"
         self.ERROR_MAJOR_NOT_SELECTED = 'Major is not selected.\nPlease first select a major.'
         self.MESSAGE_CONFIRM_MAJOR_UPDATE = 'Updating the major will reset the selected classes\nredownload the related prerequisites and\nrefetch the related data from the database.\nDo you want to proceed?'
         self.MESSAGE_CONFIRM_DB_UPDATE = "Updating the database may take some time.\nAnd it will also reset the program state.\nSo don't use this button too frequently.\nDo you want to proceed?"
