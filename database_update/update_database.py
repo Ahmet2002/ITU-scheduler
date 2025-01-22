@@ -400,9 +400,9 @@ class CourseScraper:
             driver.get(self.prerequisites_url)
 
             WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.NAME, 'derskodu'))
+                EC.presence_of_element_located((By.NAME, 'DersBransKoduId'))
             )
-            dropdown = driver.find_element(By.NAME, 'derskodu')  # or By.CSS_SELECTOR or By.XPATH
+            dropdown = driver.find_element(By.NAME, 'DersBransKoduId')  # or By.CSS_SELECTOR or By.XPATH
             select = Select(dropdown)
             options = select.options
             self.class_codes = [option.get_attribute('value') for option in options]
@@ -424,6 +424,7 @@ if __name__ == '__main__':
     dummy_object = DummyClass()  # Signal to update progress bar
     scraper = CourseScraper(logger)
     scraper.conn = sqlite3.connect('courses.db')
+    scraper.get_class_code_ids_and_token()
     return_code = scraper.update_database(dummy_object)
     scraper.conn.close()
     print(f'return code: {return_code}')
