@@ -77,7 +77,7 @@ class CourseScheduler(QMainWindow):
         self.added_classes_tab = AddedClassesTab(self.tabs, self.backend)
         self.slot_list_tab = SlotListTab(self.tabs, self.backend)
         self.time_table_tab = TimeTableTab(self.tabs, self.backend)
-        self.already_taken_classes_tab = AlreadyTakenClassesTab(self.tabs, self.backend)
+        # self.already_taken_classes_tab = AlreadyTakenClassesTab(self.tabs, self.backend)
         self.time_exclusion_tab = TimeExclusionTab(self.tabs, self.backend)
 
         self.class_portfolio_tab.classes_list.added.connect(self.added_classes_tab.add_class)
@@ -89,7 +89,7 @@ class CourseScheduler(QMainWindow):
         self.tabs.addTab(self.added_classes_tab, 'Added Classes')
         self.tabs.addTab(self.slot_list_tab, 'Select Classes')
         self.tabs.addTab(self.time_table_tab, 'Time Table')
-        self.tabs.addTab(self.already_taken_classes_tab, 'Already Taken Classes')
+        # self.tabs.addTab(self.already_taken_classes_tab, 'Already Taken Classes')
         self.tabs.addTab(self.time_exclusion_tab, 'Add Time Exclusions')
         self.layout.addWidget(self.tabs)
 

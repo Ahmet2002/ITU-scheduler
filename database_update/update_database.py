@@ -8,10 +8,6 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 
 
-
-# onsart linki
-# https://www.sis.itu.edu.tr/TR/ogrenci/lisans/ders-bilgileri/ders-bilgileri.php?subj=MAT&numb=103
-
 class CourseScraper:
     def __init__(self, logger):
         self._config()
@@ -28,7 +24,6 @@ class CourseScraper:
         self.class_iter = 1
         self.professor_iter = 1
         self.major_iter = 1
-        self.class_codes = []
         self.class_code_ids = []
         self.token = ''
         self.cancelled = False
@@ -49,34 +44,31 @@ class CourseScraper:
 
     def trigger_cancel(self):
         self.cancelled = True
+    
+    def get_class_code_ids_and_token(self):
+        response = requests.get("https://obs.itu.edu.tr/public/DersProgram")
+        soup = BeautifulSoup(response.content, 'html.parser')
+        self.token = soup.find("input", {"name": "__RequestVerificationToken"})["value"]
+        codes_and_ids = requests.get("https://obs.itu.edu.tr/public/DersProgram/SearchBransKoduByProgramSeviye?programSeviyeTipiAnahtari=LS")
+        self.class_code_ids = [c["bransKoduId"] for c in json.loads(codes_and_ids.text)]
 
-    def fetch_classes(self, progress_signal):
-        if self._table_exists('Classes'):
-            self.logger.debug('Classes table already exists.')
-            self._load_class_code_name_map()
-        else:
-            return self._download_classes_if_not_exist(progress_signal)
-        return self.SUCCESS
 
     def update_database(self, progress_signal):
         self._reset_state()
-        return_code = self.fetch_classes(progress_signal)
-        if return_code != self.SUCCESS:
-            return self._reset_state_and_return(return_code)
 
-        i = len(self.class_code_ids) + 1
+        i = 1
         for class_code_id in self.class_code_ids:
             if self.cancelled:
                 return self._reset_state_and_return(self.CANCELLED)
 
-            post_response = requests.get("https://obs.itu.edu.tr/public/DersProgram/DersProgramSearch?" + 
+            response = requests.get("https://obs.itu.edu.tr/public/DersProgram/DersProgramSearch?" + 
             f"ProgramSeviyeTipiAnahtari=LS&dersBransKoduId={class_code_id}&__RequestVerificationToken={self.token}")
-            if post_response.status_code != 200:
-                print(f'Invalid Response, status code: {post_response.status_code}')
+            if response.status_code != 200:
+                print(f'Invalid Response, status code: {response.status_code}')
                 return self._reset_state_and_return(self.ERROR)
 
             try:
-                data = json.loads(post_response.text)['dersProgramList']
+                data = json.loads(response.text)['dersProgramList']
 
                 for row in data:
                     if not self._row_ok(row):
@@ -248,72 +240,14 @@ class CourseScraper:
         self.class_iter = len(class_infos) + 1
 
     
-    def _download_classes_if_not_exist(self, progress_signal):
-        class_list = []
-        self.class_iter = 1
-
-        i = 1
-        for class_code in self.class_codes:
-            if self.cancelled:
-                return self.CANCELLED
-            
-            form_data = {'derskodu': class_code}
-            response = requests.post(self.prerequisites_url, data=form_data)
-
-            if response.status_code != 200:
-                print(f'Invalid Response for prerequisites for {class_code}, status code: {response.status_code}')
-                return self.ERROR
-
-            try:
-                soup = BeautifulSoup(response.content, 'html.parser')
-
-                table = soup.find('table')
-                if table is None:
-                    continue
-
-                for row in table.find_all('tr'):
-                    columns = row.find_all('td')
-                    if columns == []:
-                        continue
-
-                    not_parsed_prerequisites = columns[2].get_text(separator=' ')
-                    parsed_prerequisites = self._parse_prerequisite_class_code_names(not_parsed_prerequisites)
-                    class_list.append([
-                        self.class_iter,
-                        columns[0].text.strip(),
-                        columns[1].text.strip(),
-                        '&'.join('|'.join(or_group) for or_group in parsed_prerequisites)
-                    ])
-                    self.class_iter += 1
-            except Exception:
-                return self.ERROR
-            
-            progress_signal.emit(i)
-            i += 1
-
-        self.class_code_name_map = {c[1]: c[0] for c in class_list}
-        cursor = self.conn.cursor()
-        cursor.execute('''
-        CREATE TABLE IF NOT EXISTS Classes (
-            class_id INTEGER PRIMARY KEY,
-            class_code_name TEXT,
-            class_title TEXT,
-            prerequisite_class_ids TEXT -- Store as a comma-separated string
-        )
-        ''')
-        self.conn.commit()
-        cursor.executemany('''INSERT INTO Classes (class_id, class_code_name, class_title, prerequisite_class_ids)
-                                VALUES (?, ?, ?, ?)''', class_list)
-        self.conn.commit()
-        return self.SUCCESS
-    
     def store_in_db(self):
         self._create_tables_if_not_exist()
         cursor = self.conn.cursor()
 
-        for table in ['Courses', 'Professors', 'Majors']:
+        for table in ['Courses', 'Classes', 'Professors', 'Majors']:
             cursor.execute(f"DELETE FROM {table}")
-            cursor.execute("DELETE FROM sqlite_sequence WHERE name='Courses'")
+            
+        cursor.execute("DELETE FROM sqlite_sequence")
         self.conn.commit()
 
         cursor.executemany('''INSERT INTO Courses (crn, professor_id, class_id, time_tuples, quota) 
@@ -371,45 +305,6 @@ class CourseScraper:
             professor_name TEXT
         )''')
         self.conn.commit()
-
-    def get_class_code_ids_and_token(self):
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")  # Runs Chrome in headless mode
-        chrome_options.add_argument("--disable-gpu")  # Disable GPU hardware acceleration
-        chrome_options.add_argument("--no-sandbox")  # Bypass OS security model
-
-        driver = webdriver.Chrome(options=chrome_options)
-
-        try:
-            driver.get('https://obs.itu.edu.tr/public/DersProgram')
-
-            education_level_dropdown = Select(driver.find_element(By.ID, 'programSeviyeTipiId'))
-            education_level_dropdown.select_by_value('LS')  # 'LS' is the value for "Undergraduate"
-
-            WebDriverWait(driver, 5).until(
-                lambda d: len(d.find_elements(By.XPATH, f"//select[@id='dersBransKoduId']/option")) > 1
-            )
-
-            page_source = driver.page_source
-            soup = BeautifulSoup(page_source, 'html.parser')
-            course_code_dropdown = soup.find('select', {'id': 'dersBransKoduId'})
-            self.class_code_ids = [option['value'] for option in course_code_dropdown.find_all('option') if option['value']]
-
-            self.token = soup.find("input", {"name": "__RequestVerificationToken"})["value"]
-
-            driver.get(self.prerequisites_url)
-
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.NAME, 'DersBransKoduId'))
-            )
-            dropdown = driver.find_element(By.NAME, 'DersBransKoduId')  # or By.CSS_SELECTOR or By.XPATH
-            select = Select(dropdown)
-            options = select.options
-            self.class_codes = [option.get_attribute('value') for option in options]
-        except:
-            raise
-        finally:
-            driver.quit()
 
 
 

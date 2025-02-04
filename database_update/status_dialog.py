@@ -18,8 +18,7 @@ class Worker(QThread):
         return_code = self.scraper.SUCCESS
         try:
             self.scraper.get_class_code_ids_and_token()
-            self.update_progress_bar.emit(len(self.scraper.class_codes)
-                                + len(self.scraper.class_code_ids))
+            self.update_progress_bar.emit(len(self.scraper.class_code_ids))
         except:
             return_code = self.scraper.ERROR
             self.update_progress_bar.emit(1)
