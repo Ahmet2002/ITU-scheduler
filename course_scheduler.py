@@ -8,9 +8,10 @@ from database_update.status_dialog import Worker, ProgressDialog
 from tabs.class_portfolio_tab import ClassPortfolioTab
 from tabs.added_classes_tab import AddedClassesTab
 from tabs.slot_list_tab import SlotListTab
-from tabs.time_table_tab import TimeTableTab
+from tabs.time_table_tab_new import TimeTableTab
+from tabs.enrollmentTab import EnrollmentTab
 from tabs.time_exclusion_tab import TimeExclusionTab
-from tabs.already_taken_classes_tab import AlreadyTakenClassesTab
+# from tabs.already_taken_classes_tab import AlreadyTakenClassesTab
 from course_schduler_backend import CourseSchedulerBackend
 import sqlite3, logging, os
 
@@ -76,7 +77,8 @@ class CourseScheduler(QMainWindow):
         self.class_portfolio_tab = ClassPortfolioTab(self.tabs, self.backend)
         self.added_classes_tab = AddedClassesTab(self.tabs, self.backend)
         self.slot_list_tab = SlotListTab(self.tabs, self.backend)
-        self.time_table_tab = TimeTableTab(self.tabs, self.backend)
+        self.time_table_tab = TimeTableTab(self, self.backend)
+        self.enrollment_tab = EnrollmentTab(self, self.backend)
         # self.already_taken_classes_tab = AlreadyTakenClassesTab(self.tabs, self.backend)
         self.time_exclusion_tab = TimeExclusionTab(self.tabs, self.backend)
 
@@ -88,9 +90,10 @@ class CourseScheduler(QMainWindow):
         self.tabs.addTab(self.class_portfolio_tab, 'Class Portfolio')
         self.tabs.addTab(self.added_classes_tab, 'Added Classes')
         self.tabs.addTab(self.slot_list_tab, 'Select Classes')
-        self.tabs.addTab(self.time_table_tab, 'Time Table')
+        self.tabs.addTab(self.time_table_tab, 'Schedules')
+        self.tabs.addTab(self.enrollment_tab, 'Enroll')
         # self.tabs.addTab(self.already_taken_classes_tab, 'Already Taken Classes')
-        self.tabs.addTab(self.time_exclusion_tab, 'Add Time Exclusions')
+        self.tabs.addTab(self.time_exclusion_tab, 'Time Exclusions')
         self.layout.addWidget(self.tabs)
 
     def _init_major_dropdown(self):
@@ -115,7 +118,7 @@ class CourseScheduler(QMainWindow):
         # Create a message box asking for confirmation
         confirmation_dialog = QMessageBox(self)
         confirmation_dialog.setIcon(QMessageBox.Question)
-        confirmation_dialog.setWindowTitle("Confirm Update")
+        confirmation_dialog.setWindowTitle("Confirm Action")
         confirmation_dialog.setText(confirm_message)
         confirmation_dialog.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         confirmation_dialog.setDefaultButton(QMessageBox.No)

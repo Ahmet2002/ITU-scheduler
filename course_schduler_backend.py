@@ -17,6 +17,8 @@ class CourseSchedulerBackend:
         self.selected_class_code_names_set = set()
         self.excluded_time_blocks = set() # Holds (day, start_time, end_time) tuples. start_time & end_time in minutes
         self.results = [] # Holds lists of course ids each list being a result
+        self.enrollment_results = []
+        self.enrollment_states = []
         self.current_result_index = 0
         self.something_changed = True
         self.temp_results = [] # Temporary results so that we dont mess up the previous results if some problem occurs during the calculation
@@ -63,6 +65,8 @@ class CourseSchedulerBackend:
         self.selected_class_code_names = []
         self.selected_class_ids = []
         self.results = []
+        self.enrollment_results = []
+        self.enrollment_states = []
         self.course_id_to_same_time_course_ids_map = {}
         self.current_result_index = 0
         self.something_changed = True
@@ -80,6 +84,8 @@ class CourseSchedulerBackend:
             'student_major_id': self.student_major_id,
             'course_id_to_same_time_course_ids_map': self.course_id_to_same_time_course_ids_map,
             'results': self.results,
+            'enrollment_results': self.enrollment_results,
+            'enrollment_states': self.enrollment_states,
             'current_result_index': self.current_result_index,
             'something_changed': self.something_changed,
             'current_class_code': self.current_class_code,
@@ -100,6 +106,8 @@ class CourseSchedulerBackend:
             course_id_str_to_same_time_course_ids_map = state.get('course_id_to_same_time_course_ids_map', {})
             self.course_id_to_same_time_course_ids_map = {int(key): value for key, value in course_id_str_to_same_time_course_ids_map.items()}
             self.results = state.get('results', [])
+            self.enrollment_results = state.get('enrollment_results', [])
+            self.enrollment_states = state.get('enrollment_states', [])
             self.current_result_index = state.get('current_result_index', 0)
             self.something_changed = state.get('something_changed', True)
             self.excluded_time_blocks = set([tuple(int(item) for item in lst) for lst in state.get('excluded_time_blocks', [])])
