@@ -4,4 +4,4 @@ requests
 opencv-python-headless
 sortedcontainers
 qdarkstyle
-browser-cookie3 0.20.1
+rookiepy

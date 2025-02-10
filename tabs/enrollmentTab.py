@@ -239,6 +239,7 @@ class EnrollmentTab(QWidget):
             self.auth_key = ""
             self.cookies = ""
             print("Authentication failed.")
+            self.parent.show_warning("Authentication failed.Be sure to be logged in to ITU Kepler and use Chrome as the browser.")
 
         self.auth_btn.setStyleSheet(f"""
             QPushButton {f'''
